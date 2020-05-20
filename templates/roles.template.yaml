@@ -1,0 +1,98 @@
+AWSTemplateFormatVersion: 2010-09-09
+
+Description: Create role to provide access
+Parameters:
+  RepoArn:
+    Type: String
+  QSS3BucketName:
+    AllowedPattern: ^[0-9a-zA-Z]+([0-9a-zA-Z-]*[0-9a-zA-Z])*$
+    ConstraintDescription: Quick Start bucket name can include numbers, lowercase
+      letters, uppercase letters, and hyphens (-). It cannot start or end with a hyphen
+      (-).
+    Description: S3 bucket name for the Quick Start assets. This string can include
+      numbers, lowercase letters, uppercase letters, and hyphens (-). It cannot start
+      or end with a hyphen (-).
+    Type: String
+Resources:
+  BastionRole:
+    Type: "AWS::IAM::Role"
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: ec2.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: QSBucketAccess
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action: s3:GetObject
+                Resource: !Sub "arn:${AWS::Partition}:s3:::${QSS3BucketName}/*"
+              - Effect: Allow
+                Action:
+                  - logs:CreateLogStream
+                  - logs:GetLogEvents
+                  - logs:PutLogEvents
+                  - logs:DescribeLogGroups
+                  - logs:DescribeLogStreams
+                  - logs:PutRetentionPolicy
+                  - logs:PutMetricFilter
+                  - logs:CreateLogGroup
+                Resource: !Sub "arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:*:*"
+              - Effect: Allow
+                Action:
+                  - ec2:AssociateAddress
+                  - ec2:DescribeAddresses
+                  - eks:ListClusters
+                  - ec2:RevokeSecurityGroupIngress
+                  - ec2:AuthorizeSecurityGroupEgress
+                  - ec2:AuthorizeSecurityGroupIngress
+                  - ec2:DescribeSecurityGroups
+                  - ec2:DescribeInstances
+                Resource: "*"
+        - PolicyName: QSAccess
+          PolicyDocument:
+                Version: '2012-10-17'
+                Statement:
+                - Sid: Stmt1572985950175
+                  Action:
+                    - ecr:PutImageTagMutability
+                    - ecr:GetAuthorizationToken
+                    - ecr:StartImageScan
+                    - ecr:ListTagsForResource
+                    - ecr:UploadLayerPart
+                    - ecr:ListImages
+                    - ecr:CompleteLayerUpload
+                    - ecr:TagResource
+                    - ecr:DescribeRepositories
+                    - ecr:DeleteRepositoryPolicy
+                    - ecr:PutImageScanningConfiguration
+                    - ecr:GetDownloadUrlForLayer
+                    - ecr:PutImage
+                    - ecr:UntagResource
+                    - ecr:BatchGetImage
+                    - ecr:DescribeImages
+                    - ecr:StartLifecyclePolicyPreview
+                    - ecr:InitiateLayerUpload
+                    - ecr:GetRepositoryPolicy
+                    - ecr:BatchCheckLayerAvailability
+                  Effect: Allow
+                  Resource: !Ref RepoArn
+                - Sid: Stmt1572985950176
+                  Effect: Allow
+                  Action:
+                    - ecr:GetAuthorizationToken
+                  Resource: "*"
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore
+        - arn:aws:iam::aws:policy/CloudWatchAgentServerPolicy
+
+Outputs:
+  BastionQSRole:
+    Value: !Ref BastionRole
+  BastionQSRoleArn:
+    Value: !GetAtt BastionRole.Arn

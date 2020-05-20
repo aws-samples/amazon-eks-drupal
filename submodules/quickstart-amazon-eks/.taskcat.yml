@@ -1,0 +1,64 @@
+project:
+  name: quickstart-amazon-eks
+  owner: quickstart-eng@amazon.com
+  regions:
+  - us-east-1
+  - us-east-2
+  - us-west-2
+  - sa-east-1
+  - eu-central-1
+  - eu-west-1
+  - eu-west-2
+  - eu-west-3
+  - ap-northeast-1
+  - ap-southeast-1
+  - ap-southeast-2
+  template: templates/amazon-eks-master.template.yaml
+  parameters:
+    RemoteAccessCIDR: 10.0.0.0/16
+    QSS3BucketName: $[taskcat_autobucket]
+    QSS3BucketRegion: $[taskcat_current_region]
+  lambda_source_path: functions/source
+  lambda_zip_path: functions/packages
+tests:
+  quickstart-amazon-eks-defaults:
+    parameters:
+      AvailabilityZones: $[taskcat_genaz_3]
+  quickstart-amazon-eks-no-bastion:
+    parameters:
+      AvailabilityZones: $[taskcat_genaz_3]
+      ProvisionBastionHost: Disabled
+    regions:
+      - eu-north-1
+  quickstart-amazon-eks-cluster-autoscaler:
+    parameters:
+      AvailabilityZones: $[taskcat_genaz_3]
+      ClusterAutoScaler: Enabled
+    regions:
+    - eu-central-1
+  quickstart-amazon-eks-efs:
+    parameters:
+      AvailabilityZones: $[taskcat_genaz_3]
+      EfsStorageClass: Enabled
+    regions:
+    - us-west-2
+  quickstart-amazon-eks-managed-node-group:
+    parameters:
+      AvailabilityZones: $[taskcat_genaz_3]
+      ClusterAutoScaler: Disabled
+      ManagedNodeGroup: 'yes'
+      ManagedNodeGroupAMIType: AL2_x86_64
+    regions:
+    - us-east-1
+  quickstart-amazon-eks-monitoring-prom-graf:
+    parameters:
+      AvailabilityZones: $[taskcat_genaz_3]
+      MonitoringStack: Prometheus + Grafana
+    regions:
+    - ap-southeast-2
+  quickstart-amazon-eks-2az:
+    parameters:
+      AvailabilityZones: $[taskcat_genaz_2]
+      NumberOfAZs: "2"
+    regions:
+    - ca-central-1

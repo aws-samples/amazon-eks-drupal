@@ -1,0 +1,392 @@
+--- 
+AWSTemplateFormatVersion: "2010-09-09"
+Description: "Get parameter values from the kubernetes cluster deployment"
+Parameters: 
+  DatabaseUrl: 
+    Type: String
+  DbName: 
+    Type: String
+  DbPass: 
+    Type: String
+  DbUsername: 
+    Type: String
+  ECRRepoUri: 
+    Type: String
+  EKSClusterName: 
+    Type: String
+  KubeConfigKmsContext: 
+    Default: EKSQuickStart
+    Type: String
+  KubeConfigPath: 
+    Type: String
+  KubeGetLambdaArn: 
+    Type: String
+  KubeManifestLambdaArn: 
+    Type: String
+  NodeInstanceRoleArn: 
+    Type: String
+  VPCID: 
+    Type: String
+  Subnet1:
+    Type: String
+  Subnet2:
+    Type: String
+  Subnet3:
+    Type: String
+  ClusterOIDCURL:
+    Type: String
+Resources: 
+  #https://raw.githubusercontent.com/kubernetes-sigs/aws-alb-ingress-controller/v1.1.5/docs/examples/iam-policy.json
+  ALBIngressControllerIAMPolicy: 
+    Type: "AWS::IAM::ManagedPolicy"
+    Properties: 
+      PolicyDocument: 
+        Statement: 
+          - Action: 
+              - "acm:DescribeCertificate"
+              - "acm:ListCertificates"
+              - "acm:GetCertificate"
+            Effect: Allow
+            Resource: "*"
+          - 
+            Action: 
+              - "ec2:AuthorizeSecurityGroupIngress"
+              - "ec2:CreateSecurityGroup"
+              - "ec2:CreateTags"
+              - "ec2:DeleteTags"
+              - "ec2:DeleteSecurityGroup"
+              - "ec2:DescribeAccountAttributes"
+              - "ec2:DescribeAddresses"
+              - "ec2:DescribeInstances"
+              - "ec2:DescribeInstanceStatus"
+              - "ec2:DescribeInternetGateways"
+              - "ec2:DescribeNetworkInterfaces"
+              - "ec2:DescribeSecurityGroups"
+              - "ec2:DescribeSubnets"
+              - "ec2:DescribeTags"
+              - "ec2:DescribeVpcs"
+              - "ec2:ModifyInstanceAttribute"
+              - "ec2:ModifyNetworkInterfaceAttribute"
+              - "ec2:RevokeSecurityGroupIngress"
+            Effect: Allow
+            Resource: "*"
+          - 
+            Action: 
+              - "elasticloadbalancing:AddListenerCertificates"
+              - "elasticloadbalancing:AddTags"
+              - "elasticloadbalancing:CreateListener"
+              - "elasticloadbalancing:CreateLoadBalancer"
+              - "elasticloadbalancing:CreateRule"
+              - "elasticloadbalancing:CreateTargetGroup"
+              - "elasticloadbalancing:DeleteListener"
+              - "elasticloadbalancing:DeleteLoadBalancer"
+              - "elasticloadbalancing:DeleteRule"
+              - "elasticloadbalancing:DeleteTargetGroup"
+              - "elasticloadbalancing:DeregisterTargets"
+              - "elasticloadbalancing:DescribeListenerCertificates"
+              - "elasticloadbalancing:DescribeListeners"
+              - "elasticloadbalancing:DescribeLoadBalancers"
+              - "elasticloadbalancing:DescribeLoadBalancerAttributes"
+              - "elasticloadbalancing:DescribeRules"
+              - "elasticloadbalancing:DescribeSSLPolicies"
+              - "elasticloadbalancing:DescribeTags"
+              - "elasticloadbalancing:DescribeTargetGroups"
+              - "elasticloadbalancing:DescribeTargetGroupAttributes"
+              - "elasticloadbalancing:DescribeTargetHealth"
+              - "elasticloadbalancing:ModifyListener"
+              - "elasticloadbalancing:ModifyLoadBalancerAttributes"
+              - "elasticloadbalancing:ModifyRule"
+              - "elasticloadbalancing:ModifyTargetGroup"
+              - "elasticloadbalancing:ModifyTargetGroupAttributes"
+              - "elasticloadbalancing:RegisterTargets"
+              - "elasticloadbalancing:RemoveListenerCertificates"
+              - "elasticloadbalancing:RemoveTags"
+              - "elasticloadbalancing:SetIpAddressType"
+              - "elasticloadbalancing:SetSecurityGroups"
+              - "elasticloadbalancing:SetSubnets"
+              - "elasticloadbalancing:SetWebACL"
+            Effect: Allow
+            Resource: "*"
+          - 
+            Action: 
+              - "iam:CreateServiceLinkedRole"
+              - "iam:GetServerCertificate"
+              - "iam:ListServerCertificates"
+            Effect: Allow
+            Resource: "*"
+          - 
+            Action: 
+              - "cognito-idp:DescribeUserPoolClient"
+            Effect: Allow
+            Resource: "*"
+          - 
+            Action: 
+              - "waf-regional:GetWebACLForResource"
+              - "waf-regional:GetWebACL"
+              - "waf-regional:AssociateWebACL"
+              - "waf-regional:DisassociateWebACL"
+            Effect: Allow
+            Resource: "*"
+          - 
+            Action: 
+              - "tag:GetResources"
+              - "tag:TagResources"
+            Effect: Allow
+            Resource: "*"
+          - 
+            Action: 
+              - "waf:GetWebACL"
+            Effect: Allow
+            Resource: "*"
+        Version: "2012-10-17"
+      ManagedPolicyName: ALBIngressControllerIAMPolicy
+  IngressControllerRole:
+    Type: "AWS::IAM::Role"
+    Properties:
+      RoleName: eks-alb-ingress-controller
+      AssumeRolePolicyDocument: 
+        Version: 2012-10-17
+        Statement: 
+          - Sid: 4576
+            Action: "sts:AssumeRole"
+            Effect: Allow
+            Principal: 
+              Service: ec2.amazonaws.com
+          - Sid: 1234
+            Effect: Allow
+            Principal:
+              AWS:  !Sub ${NodeInstanceRoleArn}
+            Action: sts:AssumeRole
+          - Sid: '12345423'
+            Effect: Allow
+            Principal:
+              Federated: !Sub arn:aws:iam::${AWS::AccountId}:oidc-provider/${ClusterOIDCURL}
+            Action: sts:AssumeRoleWithWebIdentity
+            # Condition:
+            #   StringEquals: 
+            #       !Sub '${ClusterOIDCURL}:sub' : 'kube-system:alb-ingress-controller'
+      ManagedPolicyArns:  
+        - !Sub ${ALBIngressControllerIAMPolicy}
+      Description: "Role used to setup IAM in Kubernetws service account"
+      Path: /
+  #https://raw.githubusercontent.com/kubernetes-sigs/aws-alb-ingress-controller/v1.1.5/docs/examples/rbac-role.yaml
+  CreateRBACClusterRole: 
+    DependsOn: ALBIngressControllerIAMPolicy
+    Type: "Custom::KubeManifest"
+    Version: "1.0"
+    Properties: 
+      KubeConfigKmsContext: !Ref KubeConfigKmsContext
+      KubeConfigPath: !Ref KubeConfigPath
+      Manifest: !Sub |
+          apiVersion: rbac.authorization.k8s.io/v1
+          kind: ClusterRole
+          metadata:
+            labels:
+              app.kubernetes.io/name: alb-ingress-controller
+            name: alb-ingress-controller
+          rules:
+            - apiGroups:
+                - ""
+                - extensions
+              resources:
+                - configmaps
+                - endpoints
+                - events
+                - ingresses
+                - ingresses/status
+                - services
+              verbs:
+                - create
+                - get
+                - list
+                - update
+                - watch
+                - patch
+            - apiGroups:
+                - ""
+                - extensions
+              resources:
+                - nodes
+                - pods
+                - secrets
+                - services
+                - namespaces
+              verbs:
+                - get
+                - list
+                - watch
+      ServiceToken: !Ref KubeManifestLambdaArn
+  CreateRBACClusterRoleBinding: 
+    DependsOn: CreateRBACClusterRole
+    Type: "Custom::KubeManifest"
+    Version: "1.0"
+    Properties: 
+      KubeConfigKmsContext: !Ref KubeConfigKmsContext
+      KubeConfigPath: !Ref KubeConfigPath
+      Manifest: !Sub |
+          apiVersion: rbac.authorization.k8s.io/v1
+          kind: ClusterRoleBinding
+          metadata:
+            labels:
+              app.kubernetes.io/name: alb-ingress-controller
+            name: alb-ingress-controller
+          roleRef:
+            apiGroup: rbac.authorization.k8s.io
+            kind: ClusterRole
+            name: alb-ingress-controller
+          subjects:
+            - kind: ServiceAccount
+              name: alb-ingress-controller
+              namespace: kube-system
+      ServiceToken: !Ref KubeManifestLambdaArn
+  CreateRBACServiceAccount: 
+    Type: "Custom::KubeManifest"
+    Version: "1.0"
+    DependsOn: CreateRBACClusterRoleBinding
+    Properties: 
+      ServiceToken: !Ref KubeManifestLambdaArn
+      KubeConfigKmsContext: !Ref KubeConfigKmsContext
+      KubeConfigPath: !Ref KubeConfigPath
+      Manifest: !Sub |
+          apiVersion: v1
+          kind: ServiceAccount
+          metadata:
+            labels:
+              app.kubernetes.io/name: alb-ingress-controller
+            name: alb-ingress-controller
+            namespace: kube-system
+            annotations:
+              eks.amazonaws.com/role-arn: ${IngressControllerRole.Arn}
+  #https://raw.githubusercontent.com/kubernetes-sigs/aws-alb-ingress-controller/v1.1.5/docs/examples/alb-ingress-controller.yaml
+  CreateALBIngressControllerDeployment: 
+    DependsOn: CreateRBACServiceAccount
+    Type: "Custom::KubeManifest"
+    Version: "1.0"
+    Properties: 
+      ServiceToken: !Ref KubeManifestLambdaArn
+      KubeConfigKmsContext: !Ref KubeConfigKmsContext
+      KubeConfigPath: !Ref KubeConfigPath
+      Manifest: !Sub |
+          apiVersion: apps/v1
+          kind: Deployment
+          metadata:
+            labels:
+              app.kubernetes.io/name: alb-ingress-controller
+            name: alb-ingress-controller
+            namespace: kube-system
+          spec:
+            replicas: 1
+            selector:
+              matchLabels:
+                app.kubernetes.io/name: alb-ingress-controller
+            strategy:
+              rollingUpdate:
+                maxSurge: 1
+                maxUnavailable: 1
+              type: RollingUpdate
+            template:
+              metadata:
+                labels:
+                  app.kubernetes.io/name: alb-ingress-controller
+              spec:
+                containers:
+                  - name: alb-ingress-controller
+                    args:
+                      - --ingress-class=alb
+                      - --cluster-name=${EKSClusterName}
+                      - --aws-vpc-id=${VPCID}
+                      - --aws-region=${AWS::Region}
+                    image: docker.io/amazon/aws-alb-ingress-controller:v1.1.4
+                    imagePullPolicy: Always
+                serviceAccountName: alb-ingress-controller
+  CreateDeployment: 
+    DependsOn: CreateALBIngressControllerDeployment
+    Properties: 
+      KubeConfigKmsContext: !Ref KubeConfigKmsContext
+      KubeConfigPath: !Ref KubeConfigPath
+      Manifest: !Sub |
+          apiVersion: apps/v1
+          kind: Deployment
+          metadata:
+            name: "qsdrupal-deployment"
+          spec:
+            selector:
+              matchLabels:
+                app: "qsdrupal"
+            replicas: 5
+            template:
+              metadata:
+                labels:
+                  app: "qsdrupal"
+              spec:
+                containers:
+                - image: ${ECRRepoUri}
+                  imagePullPolicy: Always
+                  name: "qsdrupal"
+                  ports:
+                  - containerPort: 80
+      ServiceToken: !Ref KubeManifestLambdaArn
+    Type: "Custom::KubeManifest"
+    Version: "1.0"
+  CreateService: 
+    DependsOn: CreateDeployment
+    Properties: 
+      KubeConfigKmsContext: !Ref KubeConfigKmsContext
+      KubeConfigPath: !Ref KubeConfigPath
+      Manifest: !Sub |
+          apiVersion: v1
+          kind: Service
+          metadata:
+            name: "service-qsdrupal"
+          spec:
+            ports:
+              - port: 80
+                targetPort: 80
+                protocol: TCP
+            type: NodePort
+            selector:
+              app: "qsdrupal"
+      ServiceToken: !Ref KubeManifestLambdaArn
+    Type: "Custom::KubeManifest"
+    Version: "1.0"
+  CreateIngress: 
+    DependsOn: CreateService
+    Properties: 
+      KubeConfigKmsContext: !Ref KubeConfigKmsContext
+      KubeConfigPath: !Ref KubeConfigPath
+      Manifest: !Sub |
+          apiVersion: extensions/v1beta1
+          kind: Ingress
+          metadata:
+            name: "qsdrupal-ingress"
+            annotations:
+              kubernetes.io/ingress.class: alb
+              alb.ingress.kubernetes.io/scheme: internet-facing
+              # alb.ingress.kubernetes.io/certificate-arn: SSLCertARN
+              alb.ingress.kubernetes.io/target-group-attributes: stickiness.enabled=true,stickiness.lb_cookie.duration_seconds=3600
+            labels:
+              app: qsdrupal-ingress
+          spec:
+            rules:
+              - http:
+                  paths:
+                    - path: /*
+                      backend:
+                        serviceName: "service-qsdrupal"
+                        servicePort: 80
+      ServiceToken: !Ref KubeManifestLambdaArn
+    Type: "Custom::KubeManifest"
+    Version: "1.0"
+
+Outputs: 
+  CreateDeploymentResource: 
+    Value: "Creates Deployment with ECR Repo"
+  CreateSecretResource: 
+    Value: "Created Secrets with database connection strings"
+  IngressControllerRoleARN: 
+    Value: !Sub ${IngressControllerRole.Arn}
+  ALBIngressControllerIAMPolicy:
+    Value: !Sub ${ALBIngressControllerIAMPolicy}
+  IngressName:
+    Value: 'qsdrupal-ingress'
+  

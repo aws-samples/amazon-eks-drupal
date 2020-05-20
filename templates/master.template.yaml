@@ -1,0 +1,778 @@
+AWSTemplateFormatVersion: 2010-09-09
+Metadata:
+  AWS::CloudFormation::Interface:
+   ParameterGroups:
+    - Label:
+        default: VPC network configuration
+      Parameters:
+        - AvailabilityZones
+        - VPCCIDR
+        - PrivateSubnet1CIDR
+        - PrivateSubnet2CIDR
+        - PrivateSubnet3CIDR
+        - PublicSubnet1CIDR
+        - PublicSubnet2CIDR
+        - PublicSubnet3CIDR
+        - RemoteAccessCIDR
+    - Label:
+        default: Amazon Bastion configuration
+      Parameters:
+        - KeyPairName
+        - BastionVariables
+    - Label:
+        default: Amazon EKS configuration
+      Parameters:
+        - NodeInstanceType
+        - NumberOfNodes
+        - NodeGroupName
+        - NodeVolumeSize
+        # - AdditionalEKSAdminArns
+        - KubernetesVersion
+    - Label:
+        default: Optional Kubernetes add-ins
+      Parameters:
+        - ClusterAutoScaler
+        - EfsStorageClass
+        - EfsPerformanceMode
+        - EfsThroughputMode
+        - EfsProvisionedThroughputInMibps
+    - Label:
+        default: Drupal Site Domain Configuration
+      Parameters:
+        - Route53HostedZoneId
+        - DrupalSiteDomain
+        - CloudFrontAlias
+    - Label:
+        default: Drupal Account Configuration
+      Parameters:
+        - DrupalAccountUsername
+        - DrupalAccountpassword
+        - DrupalSiteName
+        - DrupalAccountEmail
+    - Label:
+        default: Aurora Serverless Database Configuration
+      Parameters:
+        - EngineVersion
+        - MasterUsername
+        - MasterUserPassword
+        - EngineMode
+    - Label:
+        default: SSL Configuration
+      Parameters:
+        - SSLCertificateId
+        - CloudfrontSSLCertificateId
+    - Label:
+        default: CDN - CloudFront Configuration
+      Parameters:
+          - CloudFrontEnable
+          - CloudFrontPriceClass
+    - Label:
+        default: AWS Quick Start Configuration
+      Parameters:
+        - QSS3BucketName
+        - QSS3KeyPrefix
+        - LambdaZipsBucketName
+   ParameterLabels:
+      EngineMode:
+        default: Aurora database Engine Mode.
+      AvailabilityZones:
+        default: Availability Zones
+      MasterUsername:
+        default: Drupal Database Username
+      MasterUserPassword:
+        default: Drupal Database Password
+      EngineVersion:
+        default: Database engine version
+      DrupalSiteDomain:
+        default: Drupal Site Domain
+      KeyPairName:
+        default: Bastion SSH key name
+      PrivateSubnet1CIDR:
+        default: Private subnet 1 CIDR
+      PrivateSubnet2CIDR:
+        default: Private subnet 2 CIDR
+      PrivateSubnet3CIDR:
+        default: Private subnet 3 CIDR
+      PublicSubnet1CIDR:
+        default: Public subnet 1 CIDR
+      PublicSubnet2CIDR:
+        default: Public subnet 2 CIDR
+      PublicSubnet3CIDR:
+        default: Public subnet 3 CIDR
+      QSS3BucketName:
+        default: Quick Start S3 Bucket Name
+      QSS3KeyPrefix:
+        default: Quick Start S3 Key Prefix
+      RemoteAccessCIDR:
+        default: Allowed Bastion External Access CIDR
+      SSLCertificateId:
+        default: Loadbalancer SSL Certificate ARN
+      VPCCIDR:
+        default: VPC CIDR
+      CloudFrontEnable:
+        default: Enable CloudFront
+      CloudfrontSSLCertificateId:
+        default: SSL certificate ARN to be used with your cloudfront alias
+      CloudFrontAlias:
+        default: CloudFront Alias for your website
+      CloudFrontPriceClass:
+        default: CloudFront PriceClass
+      Route53HostedZoneId:
+        default: Route53 Hosted Zone ID
+      DrupalAccountUsername:
+        default: Drupal Account Username
+      DrupalAccountpassword:
+        default: Drupal Account password
+      DrupalSiteName:
+        default: Drupal Site Name
+      DrupalAccountEmail:
+        default: Drupal Account Email
+      ClusterAutoScaler:
+        default: Cluster Auto Scaler
+      EfsStorageClass:
+        default: Efs Storage Class
+      EfsPerformanceMode:
+        default: Efs Performance Mode
+      EfsThroughputMode:
+        default: Efs Throughput Mode
+      EfsProvisionedThroughputInMibps:
+        default: Efs Provisioned Throughput In Mibps
+      BastionVariables:
+        default: Bastion Variable List
+      LambdaZipsBucketName:
+        default: Lambda Zips Bucket Name
+      NodeInstanceType:
+        default: Node Instance Type
+      NumberOfNodes:
+        default: Number Of Nodes
+      NodeGroupName:
+        default: Node Group Name
+      NodeVolumeSize:
+        default: Node Volume Size
+      # AdditionalEKSAdminArns:
+      #   default: Additional EKS Admin Arn List
+      KubernetesVersion:
+        default: Kubernetes Version
+Parameters:
+  AvailabilityZones:
+    Description: The list of Availability Zones to use for the subnets in the VPC. Three
+      Availability Zones are used for this deployment, and the logical order of your
+      selections is preserved.
+    Type: List<AWS::EC2::AvailabilityZone::Name>
+  KeyPairName:
+    Description: The name of an existing public/private key pair, which allows you
+      to securely connect to your instance after it launches
+    Type: AWS::EC2::KeyPair::KeyName
+  PrivateSubnet1CIDR:
+    AllowedPattern: ^(([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])\.){3}([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])(\/(1[6-9]|2[0-8]))$
+    ConstraintDescription: CIDR block parameter must be in the form x.x.x.x/16-28
+    Default: 10.1.0.0/19
+    Description: The CIDR block for private subnet 1 located in Availability Zone 1
+    Type: String
+  PrivateSubnet2CIDR:
+    AllowedPattern: ^(([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])\.){3}([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])(\/(1[6-9]|2[0-8]))$
+    ConstraintDescription: CIDR block parameter must be in the form x.x.x.x/16-28
+    Default: 10.1.32.0/19
+    Description: The CIDR block for private subnet 2 located in Availability Zone 2
+    Type: String
+  PrivateSubnet3CIDR:
+    AllowedPattern: ^(([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])\.){3}([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])(\/(1[6-9]|2[0-8]))$
+    ConstraintDescription: CIDR block parameter must be in the form x.x.x.x/16-28
+    Default: 10.1.64.0/19
+    Description: The CIDR block for private subnet 3 located in Availability Zone 3
+    Type: String
+  PublicSubnet1CIDR:
+    AllowedPattern: ^(([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])\.){3}([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])(\/(1[6-9]|2[0-8]))$
+    ConstraintDescription: CIDR block parameter must be in the form x.x.x.x/16-28
+    Default: 10.1.128.0/20
+    Description: CIDR block for the public (DMZ) subnet 1 located in Availability
+      Zone 1
+    Type: String
+  PublicSubnet2CIDR:
+    AllowedPattern: ^(([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])\.){3}([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])(\/(1[6-9]|2[0-8]))$
+    ConstraintDescription: CIDR block parameter must be in the form x.x.x.x/16-28
+    Default: 10.1.144.0/20
+    Description: The CIDR block for the public (DMZ) subnet 2 located in Availability
+      Zone 2
+    Type: String
+  PublicSubnet3CIDR:
+    AllowedPattern: ^(([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])\.){3}([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])(\/(1[6-9]|2[0-8]))$
+    ConstraintDescription: CIDR block parameter must be in the form x.x.x.x/16-28
+    Default: 10.1.160.0/20
+    Description: The CIDR block for the public (DMZ) subnet 3 located in Availability
+      Zone 3
+    Type: String
+  QSS3BucketName:
+    AllowedPattern: ^[0-9a-zA-Z]+([0-9a-zA-Z-]*[0-9a-zA-Z])*$
+    ConstraintDescription: Quick Start bucket name can include numbers, lowercase
+      letters, uppercase letters, and hyphens (-). It cannot start or end with a hyphen
+      (-).
+    Default: quickstart-drupal-on-aws-eks
+    Description: S3 bucket name for the Quick Start assets. This string can include
+      numbers, lowercase letters, uppercase letters, and hyphens (-). It cannot start
+      or end with a hyphen (-).
+    Type: String
+  QSS3KeyPrefix:
+    AllowedPattern: ^[0-9a-zA-Z-/.]*$
+    ConstraintDescription: Quick Start key prefix can include numbers, lowercase letters,
+      uppercase letters, hyphens (-), dots(.) and forward slash (/).
+    Default: qs-drupal/
+    Description: S3 key prefix for the Quick Start assets. Quick Start key prefix
+      can include numbers, lowercase letters, uppercase letters, hyphens (-), dots(.) and
+      forward slash (/).
+    Type: String
+  RemoteAccessCIDR:
+    AllowedPattern: ^(([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])\.){3}([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])(\/([0-9]|[1-2][0-9]|3[0-2]))$
+    ConstraintDescription: CIDR block parameter must be in the form x.x.x.x/x
+    Description: The CIDR IP range that is permitted to access the instances. We recommend
+      that you set this value to a trusted IP range.
+    Type: String
+  VPCCIDR:
+    AllowedPattern: ^(([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])\.){3}([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])(\/(1[6-9]|2[0-8]))$
+    ConstraintDescription: CIDR block parameter must be in the form x.x.x.x/16-28
+    Default: 10.1.0.0/16
+    Description: The CIDR block for the VPC
+    Type: String
+  NodeInstanceType:
+    Default: t3.medium
+    AllowedValues:
+      - t2.small
+      - t2.medium
+      - t2.large
+      - t2.xlarge
+      - t2.2xlarge
+      - t3.nano
+      - t3.micro
+      - t3.small
+      - t3.medium
+      - t3.large
+      - t3.xlarge
+      - t3.2xlarge
+      - m3.medium
+      - m3.large
+      - m3.xlarge
+      - m3.2xlarge
+      - m4.large
+      - m4.xlarge
+      - m4.2xlarge
+      - m4.4xlarge
+      - m4.10xlarge
+      - m5.large
+      - m5.xlarge
+      - m5.2xlarge
+      - m5.4xlarge
+      - m5.12xlarge
+      - m5.24xlarge
+      - c4.large
+      - c4.xlarge
+      - c4.2xlarge
+      - c4.4xlarge
+      - c4.8xlarge
+      - c5.large
+      - c5.xlarge
+      - c5.2xlarge
+      - c5.4xlarge
+      - c5.9xlarge
+      - c5.18xlarge
+      - i3.large
+      - i3.xlarge
+      - i3.2xlarge
+      - i3.4xlarge
+      - i3.8xlarge
+      - i3.16xlarge
+      - r3.xlarge
+      - r3.2xlarge
+      - r3.4xlarge
+      - r3.8xlarge
+      - r4.large
+      - r4.xlarge
+      - r4.2xlarge
+      - r4.4xlarge
+      - r4.8xlarge
+      - r4.16xlarge
+      - x1.16xlarge
+      - x1.32xlarge
+      - p2.xlarge
+      - p2.8xlarge
+      - p2.16xlarge
+      - p3.2xlarge
+      - p3.8xlarge
+      - p3.16xlarge
+      - r5.large
+      - r5.xlarge
+      - r5.2xlarge
+      - r5.4xlarge
+      - r5.12xlarge
+      - r5.24xlarge
+      - r5d.large
+      - r5d.xlarge
+      - r5d.2xlarge
+      - r5d.4xlarge
+      - r5d.12xlarge
+      - r5d.24xlarge
+      - z1d.large
+      - z1d.xlarge
+      - z1d.2xlarge
+      - z1d.3xlarge
+      - z1d.6xlarge
+      - z1d.12xlarge
+    ConstraintDescription: Must be a valid EC2 instance type
+    Description: The type of EC2 instance for the node instances.
+    Type: String
+  NumberOfNodes:
+    Default: 3
+    Description: The number of Amazon EKS node instances. The default is one for each of the three Availability Zones.
+    Type: Number
+  NodeGroupName:
+    Default: Default
+    Description: The name for EKS node group.
+    Type: String
+  NodeVolumeSize:
+    Default: 20
+    Description: "The size for the node's root EBS volumes."
+    Type: String
+  KubernetesVersion:
+    Type: String
+    AllowedValues: [ "1.13", "1.14", "1.15" ]
+    Default: "1.15"
+    Description: The Kubernetes control plane version.
+  LambdaZipsBucketName:
+    Description: '[OPTIONAL] The name of the S3 bucket where the Lambda zip files should be placed. If you leave this parameter blank, an S3 bucket will be created.'
+    Type: String
+    Default: ''
+  ClusterAutoScaler:
+    Type: String
+    AllowedValues: [ Enabled, Disabled ]
+    Default: Disabled
+    Description: Choose Enabled to enable Kubernetes cluster autoscaler.
+  EfsStorageClass:
+    Type: String
+    AllowedValues: [ Enabled, Disabled ]
+    Default: Disabled
+    Description: Choose Enabled to enable EFS storage class, which will create the required EFS volume.
+  EfsPerformanceMode:
+    Type: String
+    AllowedValues: [ generalPurpose, maxIO ]
+    Default: generalPurpose
+    Description: Choose maxIO mode to provide greater IOPS with an increased latency. Only has an effect when EfsStorageClass is enabled.
+  EfsThroughputMode:
+    Type: String
+    AllowedValues: [ bursting, provisioned ]
+    Default: bursting
+    Description: Choose provisioned for throughput that is not dependent on the amount of data stored in the file system. Only has an effect when EfsStorageClass is enabled.
+  EfsProvisionedThroughputInMibps:
+    Type: Number
+    MinValue: 0
+    Default: 0
+    Description: Set to 0 if EfsThroughputMode is set to bursting. Only has an effect when EfsStorageClass is enabled.
+  # AdditionalEKSAdminArns:
+  #   Default: ""
+  #   Description: "[OPTIONAL] Comma separated list of IAM user/role Amazon Resource Names (ARNs) to be granted admin access to the EKS cluster"
+  #   Type: CommaDelimitedList
+  EngineVersion:
+    Type: String
+    Description: "Version of the database engine."
+    AllowedValues:
+      - "5.6.10a"
+      - "5.6.mysqlaurora.1.17.9"
+      - "5.6.mysql-aurora.1.19.0"
+      - "5.6.mysql-aurora.1.19.1"
+      - "5.6.mysql-aurora.1.19.2"
+      - "5.6.mysql-aurora.1.19.5"
+      - "5.6.mysql-aurora.1.19.6"
+      - "5.6.mysql-aurora.1.20.0"
+      - "5.6.mysql-aurora.1.20.1"
+      - "5.6.mysql-aurora.1.21.0"
+      - "5.6.mysql-aurora.1.22.0"
+      - "5.6.mysql-aurora.1.22.1"
+      - "5.6.mysql-aurora.1.22.1.3"
+      - "5.6.mysql-aurora.1.22.2"
+      - "5.7.12"
+      - "5.7.mysql-aurora.2.03.2"
+      - "5.7.mysql-aurora.2.03.3"
+      - "5.7.mysql-aurora.2.03.4"
+      - "5.7.mysql-aurora.2.04.0"
+      - "5.7.mysql-aurora.2.04.1"
+      - "5.7.mysql-aurora.2.04.2"
+      - "5.7.mysql-aurora.2.04.3"
+      - "5.7.mysql-aurora.2.04.4"
+      - "5.7.mysql-aurora.2.04.5"
+      - "5.7.mysql-aurora.2.04.6"
+      - "5.7.mysql-aurora.2.04.7"
+      - "5.7.mysql-aurora.2.04.8"
+      - "5.7.mysql-aurora.2.05.0"
+      - "5.7.mysql-aurora.2.06.0"
+      - "5.7.mysql-aurora.2.07.0"
+      - "5.7.mysql-aurora.2.07.1"
+      - "5.7.mysql-aurora.2.07.2"
+
+  MasterUsername:
+    Type: String
+    Description: "Username of the Database"
+  MasterUserPassword:
+    Description: "Database password for the above mentioned user"
+    Type: String
+    NoEcho: true
+  BastionVariables:
+    Description: "[OPTIONAL] Comma separated key-value pair list of Bastion environment vairiables"
+    Type: String
+    Default: ""
+  SSLCertificateId:
+    Default: ''
+    Description: "[OPTIONAL] The ARN of the SSL certificate to use for the load balancer."
+    Type: String
+  CloudfrontSSLCertificateId:
+    Default: ''
+    Description: "[OPTIONAL] The AWS Certification Manager certificate ARN for the CloudFront distribution certificate - this certificate should be created in the us-east-1 (N. Virginia) region and must reference the main domain name you use below"
+    Type: String
+  CloudFrontEnable:
+    AllowedValues:
+    - 'true'
+    - 'false'
+    Default: 'true'
+    Description: Enable CloudFront Content Delivery Network
+    Type: String
+  CloudFrontPriceClass:
+    AllowedValues:
+    - use-all-edge-locations
+    - use-only-us-canada-europe-asia
+    - use-only-us-canada-europe
+    Default: use-all-edge-locations
+    Description: Select the price class associated with the maximum price that you
+      want to pay for CloudFront service. If you select a price class other than All,
+      some of your users may experience higher latency.
+    Type: String
+    ConstraintDescription: Select a valid CloudFront Price Class.
+  CloudFrontAlias:
+    Description: Alias for the CloudFront distribution. E.g. cdn.example.com. Mandatory
+      when using HTTPS/SSL and optional when using http.
+    Type: String
+    Default: cdn.default
+    AllowedPattern: "(?!-)[a-zA-Z0-9-.]*(?<!-)"
+    ConstraintDescription: Must be a valid fully-qualified domain name.
+  Route53HostedZoneId:
+    Description: Route53 Hosted Zone ID
+    Type: String
+    Default: ''
+  DrupalSiteDomain:
+    Description: Domain name of the site. e.g. example.com. Valid FQDN required when
+      using SSL. Leave the default localhost.local for test environments.
+    AllowedPattern: "(?!-)[a-zA-Z0-9-.]*(?<!-)"
+    ConstraintDescription: Must be a valid fully-qualified domain name.
+    Type: String
+    Default: localhost.local
+  DrupalAccountUsername:
+    Description: Username for the Drupal admin account.
+    AllowedPattern: "[a-z]+"
+    ConstraintDescription: Must be all lowercase letters without spaces.
+    Type: String
+  DrupalAccountpassword:
+    Description: Password for the above Drupal admin account.
+    AllowedPattern: "[a-z]+"
+    ConstraintDescription: Must be all lowercase letters without spaces. Default is adminpass
+    Type: String
+  DrupalSiteName:
+    Description: Name of the website. Default value is AWS_DRUPAL_SITE
+    Type: String
+    Default: 'AWS_DRUPAL_SITE'
+  DrupalAccountEmail:
+    Description: Username of admin of the Drupal account. Default is admin.
+    AllowedPattern: "^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\\.[a-zA-Z0-9-.]+$"
+    ConstraintDescription: Must be a valid email id.
+    Type: String
+  EngineMode:
+    Description: Database engine mode.
+    AllowedValues: ["provisioned", "serverless"]
+    Type: String
+Mappings:
+  Engine:
+    5.6.10a:
+      enginetype: "aurora"
+      engineversion: "5.6.10a"
+    5.6.mysql-aurora.1.17.9:
+      enginetype: "aurora"
+      engineversion: "5.6.mysql_aurora.1.17.9"
+    5.6.mysql-aurora.1.19.0:
+      enginetype: "aurora"
+      engineversion: ".6.mysql_aurora.1.19.0"
+    5.6.mysql-aurora.1.19.1:
+      enginetype: "aurora"
+      engineversion: "5.6.mysql_aurora.1.19.1"
+    5.6.mysql-aurora.1.19.2:
+      enginetype: "aurora"
+      engineversion: "5.6.mysql_aurora.1.19.2"
+    5.6.mysql-aurora.1.19.5:
+      enginetype: "aurora"
+      engineversion: "5.6.mysql_aurora.1.19.5"
+    5.6.mysql-aurora.1.19.6:
+      enginetype: "aurora"
+      engineversion: "5.6.mysql_aurora.1.19.6"
+    5.6.mysql-aurora.1.20.0:
+      enginetype: "aurora"
+      engineversion: "5.6.mysql_aurora.1.20.0"
+    5.6.mysql-aurora.1.20.1:
+      enginetype: "aurora"
+      engineversion: "5.6.mysql_aurora.1.20.1"
+    5.6.mysql-aurora.1.21.0:
+      enginetype: "aurora"
+      engineversion: "5.6.mysql_aurora.1.21.0"
+    5.6.mysql-aurora.1.22.0:
+      enginetype: "aurora"
+      engineversion: "5.6.mysql_aurora.1.22.0"
+    5.6.mysql-aurora.1.22.1:
+      enginetype: "aurora"
+      engineversion: "5.6.mysql_aurora.1.22.1"
+    5.6.mysql-aurora.1.22.1.3:
+      enginetype: "aurora"
+      engineversion: "5.6.mysql_aurora.1.22.1.3"
+    5.6.mysql-aurora.1.22.2:
+      enginetype: "aurora"
+      engineversion: "5.6.mysql_aurora.1.22.2"
+    5.7.12:
+      enginetype: "aurora-mysql"
+      engineversion: "5.7.12"
+    5.7.mysql-aurora.2.03.2:
+      enginetype: "aurora-mysql"
+      engineversion: "5.7.mysql_aurora.2.03.2"
+    5.7.mysql-aurora.2.03.3:
+      enginetype: "aurora-mysql"
+      engineversion: "5.7.mysql_aurora.2.03.3"
+    5.7.mysql-aurora.2.03.4:
+      enginetype: "aurora-mysql"
+      engineversion: "5.7.mysql_aurora.2.03.4"
+    5.7.mysql-aurora.2.04.0:
+      enginetype: "aurora-mysql"
+      engineversion: "5.7.mysql_aurora.2.04.0"
+    5.7.mysql-aurora.2.04.1:
+      enginetype: "aurora-mysql"
+      engineversion: "5.7.mysql_aurora.2.04.1"
+    5.7.mysql-aurora.2.04.2:
+      enginetype: "aurora-mysql"
+      engineversion: "5.7.mysql_aurora.2.04.2"
+    5.7.mysql-aurora.2.04.3:
+      enginetype: "aurora-mysql"
+      engineversion: "5.7.mysql_aurora.2.04.3"
+    5.7.mysql-aurora.2.04.4:
+      enginetype: "aurora-mysql"
+      engineversion: "5.7.mysql_aurora.2.04.4"
+    5.7.mysql-aurora.2.04.5:
+      enginetype: "aurora-mysql"
+      engineversion: "5.7.mysql_aurora.2.04.5"
+    5.7.mysql-aurora.2.04.6:
+      enginetype: "aurora-mysql"
+      engineversion: "5.7.mysql_aurora.2.04.6"
+    5.7.mysql-aurora.2.04.7:
+      enginetype: "aurora-mysql"
+      engineversion: "5.7.mysql_aurora.2.04.7"
+    5.7.mysql-aurora.2.04.8:
+      enginetype: "aurora-mysql"
+      engineversion: "5.7.mysql_aurora.2.04.8"
+    5.7.mysql-aurora.2.05.0:
+      enginetype: "aurora-mysql"
+      engineversion: "5.7.mysql_aurora.2.05.0"
+    5.7.mysql-aurora.2.06.0:
+      enginetype: "aurora-mysql"
+      engineversion: "5.7.mysql_aurora.2.06.0"
+    5.7.mysql-aurora.2.07.0:
+      enginetype: "aurora-mysql"
+      engineversion: "5.7.mysql_aurora.2.07.0"
+    5.7.mysql-aurora.2.07.1:
+      enginetype: "aurora-mysql"
+      engineversion: "5.7.mysql_aurora.2.07.1"
+    5.7.mysql-aurora.2.07.2:
+      enginetype: "aurora-mysql"
+      engineversion: "5.7.mysql_aurora.2.07.2"
+Conditions:
+  UseSSL:
+    Fn::Not:
+    - Fn::Equals:
+      - Ref: SSLCertificateId
+      - ''
+  NoSSL:
+    Fn::Equals:
+      - Ref: SSLCertificateId
+      - ''
+  CFUseSSL:
+    Fn::Not:
+    - Fn::Equals:
+      - Ref: CloudfrontSSLCertificateId
+      - ''
+  DrupalCdnModuleCondition:
+    Fn::Equals:
+    - Ref: CloudFrontEnable
+    - 'true'
+  DrupalSiteDomainRoute53Condition:
+    Fn::And:
+    - Fn::Not:
+      - Fn::Equals:
+        - Ref: DrupalSiteDomain
+        - localhost.local
+    - Fn::Not:
+      - Fn::Equals:
+        - Ref: Route53HostedZoneId
+        - ''
+  CloudFrontAliasRoute53Condition:
+    Fn::And:
+    - Fn::Not:
+      - Fn::Equals:
+        - Ref: CloudFrontAlias
+        - cdn.default
+    - Fn::Not:
+      - Fn::Equals:
+        - Ref: Route53HostedZoneId
+        - ''
+    - Fn::Equals:
+      - Ref: CloudFrontEnable
+      - 'true'
+  AdditionalVars: !Not [!Equals [!Ref 'BastionVariables', '']]
+Rules:
+  AuroraEngineModeRule:
+    RuleCondition:
+      Fn::Equals:
+      - Ref: EngineMode
+      - serverless
+    Assertions:
+    - Assert:
+        Fn::Contains:
+        - - 5.6.10a
+        - Ref: EngineVersion
+      AssertDescription: For the ServerlessEngine Mode , the Engine Version must be 5.6.10a
+
+  EKSSupport:
+    Assertions:
+      - AssertDescription: Your AWS Region does *NOT* yet support Amazon EKS
+        Assert: !Contains
+          -  - us-west-2
+             - us-east-1
+             - us-east-2
+             - eu-west-1
+             - eu-west-2
+             - eu-west-3
+             - eu-north-1
+             - eu-central-1
+             - ap-southeast-1
+             - ap-southeast-2
+             - ap-northeast-1
+             - ap-northeast-2
+             - ap-south-1
+          - !Ref 'AWS::Region'
+  SslAndRoute53Rule:
+    RuleCondition:
+      Fn::Or:
+      - Fn::Not:
+        - Fn::Equals:
+          - Ref: SSLCertificateId
+          - ''
+      - Fn::Not:
+        - Fn::Equals:
+          - Ref: Route53HostedZoneId
+          - ''
+    Assertions:
+    - Assert:
+        Fn::Not:
+        - Fn::Equals:
+          - Ref: DrupalSiteDomain
+          - localhost.local
+      AssertDescription: Parameter DrupalSiteDomain cannot be the default value 'localhost.local'
+        and must provide FQDN e.g. example.com, when SSLCertificateId or Route53HostedZoneIdis
+        values are provided.
+    - Assert:
+        Fn::Not:
+        - Fn::Equals:
+          - Ref: CloudFrontAlias
+          - cdn.default
+      AssertDescription: Parameter CloudFrontAlias cannot be the default value 'cdn.default'
+        and must provide FQDN e.g. cdn.example.com, when SSLCertificateId or Route53HostedZoneIdis
+        values are provided.
+Resources:
+  VPCStack:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Sub 'https://${QSS3BucketName}.s3.amazonaws.com/${QSS3KeyPrefix}submodules/quickstart-aws-vpc/templates/aws-vpc.template'
+      Parameters:
+        AvailabilityZones: !Join [ ',', !Ref 'AvailabilityZones' ]
+        KeyPairName: !Ref 'KeyPairName'
+        NumberOfAZs: '3'
+        PrivateSubnet1ACIDR: !Ref 'PrivateSubnet1CIDR'
+        PrivateSubnet2ACIDR: !Ref 'PrivateSubnet2CIDR'
+        PrivateSubnet3ACIDR: !Ref 'PrivateSubnet3CIDR'
+        PrivateSubnetATag2: "kubernetes.io/role/internal-elb="
+        PublicSubnet1CIDR: !Ref 'PublicSubnet1CIDR'
+        PublicSubnet2CIDR: !Ref 'PublicSubnet2CIDR'
+        PublicSubnet3CIDR: !Ref 'PublicSubnet3CIDR'
+        PublicSubnetTag2: "kubernetes.io/role/elb="
+        VPCCIDR: !Ref 'VPCCIDR'
+  DrupalStack:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Sub 'https://${QSS3BucketName}.s3.amazonaws.com/${QSS3KeyPrefix}templates/drupal.template.yaml'
+      Parameters:
+        KeyPairName: !Ref KeyPairName
+        VPCID: !GetAtt VPCStack.Outputs.VPCID
+        PublicSubnet1ID: !GetAtt VPCStack.Outputs.PublicSubnet1ID
+        PublicSubnet2ID: !GetAtt VPCStack.Outputs.PublicSubnet2ID
+        PublicSubnet3ID: !GetAtt VPCStack.Outputs.PublicSubnet3ID
+        PrivateSubnet1ID: !GetAtt VPCStack.Outputs.PrivateSubnet1AID
+        PrivateSubnet2ID: !GetAtt VPCStack.Outputs.PrivateSubnet2AID
+        PrivateSubnet3ID: !GetAtt VPCStack.Outputs.PrivateSubnet3AID
+        QSS3BucketName: !Ref QSS3BucketName
+        QSS3KeyPrefix: !Ref QSS3KeyPrefix
+        RemoteAccessCIDR: !Ref RemoteAccessCIDR
+        NodeInstanceType: !Ref NodeInstanceType
+        NumberOfNodes: !Ref NumberOfNodes
+        NodeGroupName: !Ref NodeGroupName
+        NodeVolumeSize: !Ref NodeVolumeSize
+        KubernetesVersion: !Ref KubernetesVersion
+        LambdaZipsBucketName: !Ref LambdaZipsBucketName
+        ClusterAutoScaler: !Ref ClusterAutoScaler
+        EfsStorageClass: !Ref EfsStorageClass
+        EfsPerformanceMode: !Ref EfsPerformanceMode
+        EfsThroughputMode: !Ref EfsThroughputMode
+        EfsProvisionedThroughputInMibps: !Ref EfsProvisionedThroughputInMibps
+        MasterUsername: !Ref MasterUsername
+        MasterUserPassword: !Ref MasterUserPassword
+        BastionVariables: !Ref BastionVariables
+        SSLCertificateId: !Ref SSLCertificateId
+        CloudFrontEnable: !Ref CloudFrontEnable
+        CloudFrontPriceClass: !Ref CloudFrontPriceClass
+        CloudFrontAlias: !Ref CloudFrontAlias
+        Route53HostedZoneId: !Ref Route53HostedZoneId
+        DrupalSiteDomain: !Ref DrupalSiteDomain
+        DrupalAccountUsername: !Ref DrupalAccountUsername
+        DrupalAccountpassword: !Ref DrupalAccountpassword
+        DrupalSiteName: !Ref DrupalSiteName
+        DrupalAccountEmail: !Ref DrupalAccountEmail
+        Engine: !FindInMap
+            - Engine
+            - !Ref EngineVersion
+            - enginetype
+        EngineVersion: !FindInMap
+              - Engine
+              - !Ref EngineVersion
+              - engineversion
+        EngineMode: !Ref EngineMode
+        CloudfrontSSLCertificateId: !Ref CloudfrontSSLCertificateId
+Outputs:
+  EKSClusterName:
+    Value: !GetAtt DrupalStack.Outputs.EKSClusterName
+  AuroraDatabaseHost:
+    Value: !GetAtt DrupalStack.Outputs.AuroraDatabaseHost
+  DatabaseName:
+    Value: !GetAtt DrupalStack.Outputs.DatabaseName
+  DatabaseUsername:
+    Value: !GetAtt DrupalStack.Outputs.DatabaseUsername
+  ECRUri:
+    Value: !GetAtt DrupalStack.Outputs.ECRUri
+  DrupalRepoName:
+    Value: !GetAtt DrupalStack.Outputs.DrupalRepoName
+  DBSecurityGroup:
+    Value: !GetAtt DrupalStack.Outputs.DBSecurityGroup
+  CloudFrontDNS:
+    Value: !GetAtt DrupalStack.Outputs.CloudFrontDNS
+  DrupalSiteUrl:
+    Description: Drupal Site URL
+    Condition: DrupalSiteDomainRoute53Condition
+    Value: !GetAtt DrupalStack.Outputs.DrupalSiteUrl
+  AlbHostName:
+    Description: Group ID of the security group used.
+    Value: !GetAtt DrupalStack.Outputs.AlbHostName

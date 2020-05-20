@@ -1,0 +1,15 @@
+AWSTemplateFormatVersion: 2010-09-09
+
+Description: Amazon Elastic Container Registry (Amazon ECR)
+
+Resources:
+    DrupalECRRepository:
+      Type: AWS::ECR::Repository
+Outputs:
+  Uri:
+    Value: !Sub "${AWS::AccountId}.dkr.ecr.${AWS::Region}.amazonaws.com/${DrupalECRRepository}"
+  RepositoryName:
+    Value: !Ref DrupalECRRepository
+  Arn:
+    Value: !GetAtt DrupalECRRepository.Arn
+ 

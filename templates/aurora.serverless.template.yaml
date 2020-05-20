@@ -1,0 +1,85 @@
+AWSTemplateFormatVersion: 2010-09-09
+
+Description: Aurora serverless cluster
+
+Parameters:
+  EngineVersion:
+    Type: String
+    Description: Version of the selected Database engine. Default is aurora engine with 5.6.10a version
+    Default: '5.6.10a'
+  MasterUsername:
+    Type: String
+    Default: auroradbroot
+  MasterUserPassword:
+    Type: String
+    NoEcho: true
+    Default: auroradbroot123
+  VpcId:
+    Type: AWS::EC2::VPC::Id
+  SubnetIdList:
+    Description: The list of SubnetIds to use for the subnet Group
+    Type: List<AWS::EC2::Subnet::Id>
+  Engine: 
+    Description: Database Engine. Default is aurora
+    Type: String
+    Default: aurora
+    AllowedValues: [ "aurora", "aurora-mysql" ]
+  EngineMode:
+    Description: Database engine mode.
+    AllowedValues: ["provisioned", "serverless"]
+    Type: String
+
+
+Resources:
+
+  AuroraSubnetGroup:
+    Type: AWS::RDS::DBSubnetGroup
+    Properties: 
+      DBSubnetGroupDescription: "Subnets available for the Aurora SampleDB DB Instance"
+      # DBSubnetGroupName: AuroradbSubnetGroup
+      SubnetIds:
+        - !Select [0,!Ref 'SubnetIdList']
+        - !Select [1,!Ref 'SubnetIdList']
+        - !Select [2,!Ref 'SubnetIdList']
+ 
+  DBSecurityGroup:
+   Type: 'AWS::EC2::SecurityGroup'
+   Properties:
+      VpcId: !Ref VpcId
+      GroupDescription: Allow ingress to Database Security Group
+
+  AuroraCluster:
+    Type: AWS::RDS::DBCluster
+    Properties:
+      Engine: !Ref Engine
+      EngineMode: !Ref EngineMode
+      EngineVersion: !Ref EngineVersion
+      MasterUsername: !Ref MasterUsername
+      MasterUserPassword: !Ref MasterUserPassword
+      BackupRetentionPeriod: 35
+      PreferredBackupWindow: 01:00-02:00
+      PreferredMaintenanceWindow: mon:03:00-mon:04:00
+      DeletionProtection: False
+      ScalingConfiguration:
+        AutoPause: true
+        MaxCapacity: 16
+        MinCapacity: 2
+        SecondsUntilAutoPause: 500
+      DBSubnetGroupName: !Sub '${AuroraSubnetGroup}'
+      VpcSecurityGroupIds:
+        - !Sub '${DBSecurityGroup.GroupId}'
+    DependsOn: [AuroraSubnetGroup, DBSecurityGroup]
+    
+Outputs:
+  Host:
+    Value: !GetAtt AuroraCluster.Endpoint.Address
+    Export:
+      Name: !Sub '${AWS::StackName}Host'
+  Name:
+    Value: !Sub AuroraCluster
+
+  MasterUsername:
+    Value: !Ref MasterUsername
+
+  DBSecurityGroup:
+    Value: !GetAtt DBSecurityGroup.GroupId
