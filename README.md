@@ -21,5 +21,5 @@ You can also use the AWS CloudFormation templates as a starting point for your o
 ![Quick Start architecture for Drupal on AWS](./qsarchitecture.png)
 
 
-To post feedback, submit feature ideas, or report bugs, use the **Issues** section of this GitHub repo. 
+To post feedback, submit feature ideas, or report bugs, use the **Issues** section of this GitHub repo...
 If you'd like to submit code for this Quick Start, please review the [AWS Quick Start Contributor's Kit](https://aws-quickstart.github.io/).
